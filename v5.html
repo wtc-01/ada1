@@ -272,6 +272,7 @@ function play(note,el){
   el.classList.add("active");
 }
 */
+/*
 function play(note,el){
   //if(!isLoaded) return;
 
@@ -284,6 +285,26 @@ function play(note,el){
   source.start(0);
 
   el.classList.add("active");
+}*/ 
+function play(note,el){
+  let buffer = bufferMap[note];
+  if(!buffer) return;
+
+  let source = audioCtx.createBufferSource();
+  let gainNode = audioCtx.createGain();
+
+  source.buffer = buffer;
+  source.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  source.start(0);
+
+  // fade out
+  gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+
+  el.classList.add("active");
+  setTimeout(()=>el.classList.remove("active"),200);
 }
 /*
 function stop(){
@@ -329,6 +350,7 @@ function touch(e){
     if(gameMode) check(note,el);
   }
 }*/
+/*
 async function touch(e){
   e.preventDefault();
 
@@ -343,6 +365,18 @@ async function touch(e){
   let note=el.dataset.note;
   play(note,el);
   if(gameMode) check(note,el);
+}*/ 
+function touch(e){
+  e.preventDefault();
+
+  for(let t of e.touches){
+    let el=document.elementFromPoint(t.clientX,t.clientY);
+    if(!el || !el.dataset.note) continue;
+
+    let note=el.dataset.note;
+    play(note,el);
+    if(gameMode) check(note,el);
+  }
 }
 
 /* ===== MOUSE ===== */
