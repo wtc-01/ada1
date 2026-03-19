@@ -2,75 +2,86 @@
 <html lang="th">
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Piano Kids Game</title>
+<title>Piano Kids Ultimate Pro</title>
 
 <style>
 body{
   margin:0;
   background:#e6f2ff;
-  font-family:sans-serif;
   text-align:center;
+  font-family:sans-serif;
 }
 
-h2{
-  margin:10px;
-}
+h2{margin:10px;}
 
-/* piano container */
 .piano{
   position:relative;
   width:100%;
   max-width:900px;
-  height:250px;
+  height:260px;
   margin:auto;
+  display:flex;
 }
 
-/* white keys */
+/* white */
 .white{
-  width:calc(100% / 14);
+  flex:1;
   height:100%;
   background:white;
   border:1px solid #333;
-  float:left;
+  position:relative;
   box-sizing:border-box;
+  box-shadow: inset 0 -5px 5px rgba(0,0,0,0.2);
 }
 
-/* black keys */
+/* black */
 .black{
   position:absolute;
-  width:4%;
+  width:3.5%;
   height:60%;
   background:black;
   top:0;
   z-index:2;
   border-radius:0 0 5px 5px;
+  box-shadow: inset 0 -3px 5px rgba(255,255,255,0.2);
 }
 
-/* active เอฟเฟกต์ */
+.label{
+  position:absolute;
+  bottom:5px;
+  width:100%;
+  font-size:12px;
+}
+
+/* เอฟเฟกต์ */
 .active{
-  background:yellow !important;
+  background:#ffe066 !important;
+  box-shadow:0 0 20px yellow;
 }
 
-.white:active{
-  background:#ddd;
+.correct{
+  background:#8cff8c !important;
 }
-.black:active{
-  background:#444;
+.wrong{
+  background:#ff6b6b !important;
 }
 
 button{
-  margin:10px;
-  padding:10px 20px;
-  font-size:18px;
+  margin:5px;
+  padding:10px;
+  font-size:16px;
 }
 </style>
 </head>
 
 <body>
 
-<h2>🎹 Piano Kids Game</h2>
-<button onclick="startGame()">เริ่มเกม</button>
-<p>คะแนน: <span id="score">0</span></p>
+<h2>🎹 Piano Kids Ultimate Pro</h2>
+
+<button onclick="startMemory()">🎯 Memory</button>
+<button onclick="startFollow()">💡 Follow</button>
+
+<p>⭐ คะแนน: <span id="score">0</span> | Level: <span id="level">1</span></p>
 
 <div class="piano" id="piano"></div>
 
@@ -81,101 +92,232 @@ const notes = [
 ];
 
 const blackMap = {
-"C4":"C#4","D4":"D#4","F4":"F#4","G4":"G#4","A4":"A#4",
-"C5":"C#5","D5":"D#5","F5":"F#5","G5":"G#5","A5":"A#5"
+"C4":"Db4","D4":"Eb4","F4":"Gb4","G4":"Ab4","A4":"Bb4",
+"C5":"Db5","D5":"Eb5","F5":"Gb5","G5":"Ab5","A5":"Bb5"
 };
 
 const piano = document.getElementById("piano");
+let audioMap = {};
+let currentKey=null;
 
-/* สร้างคีย์ */
+/* preload */
+function load(note){
+  let a=new Audio("electric_piano_sounds/"+note+".mp3");
+  a.loop=true;
+  audioMap[note]=a;
+}
+
+notes.forEach(n=>{
+  load(n);
+  if(blackMap[n]) load(blackMap[n]);
+});
+
+/* สร้างคีย์ขาว */
 notes.forEach((note,i)=>{
-  let key = document.createElement("div");
+  let key=document.createElement("div");
   key.className="white";
   key.dataset.note=note;
-  key.onclick=()=>pressKey(note,key);
+  key.innerHTML=`<div class="label">${note}</div>`;
   piano.appendChild(key);
+});
 
-  if(blackMap[note]){
-    let black = document.createElement("div");
-    black.className="black";
-    black.dataset.note=blackMap[note];
-    black.style.left = (i * (100/14) + (100/14)*0.7) + "%";
-    black.onclick=()=>pressKey(blackMap[note],black);
-    piano.appendChild(black);
+/* ตำแหน่งคีย์ดำจริง */
+const blackOffset = {
+"C":0.7,
+"D":1.7,
+"F":3.7,
+"G":4.7,
+"A":5.7
+};
+
+/* สร้างคีย์ดำ */
+notes.forEach((note,i)=>{
+  let base = note[0];
+
+  if(blackMap[note] && blackOffset[base] !== undefined){
+    let b=document.createElement("div");
+    b.className="black";
+    let octave = Math.floor(i/7);
+    let pos = (octave*7 + blackOffset[base]) * (100/14);
+    b.style.left = pos + "%";
+
+    let bn = blackMap[note];
+    b.dataset.note=bn;
+    b.innerHTML=`<div class="label" style="color:white">${bn}</div>`;
+    piano.appendChild(b);
   }
 });
 
-/* เล่นเสียง */
-function play(note){
-  let audio = new Audio("electric_piano_sounds/" + note + ".mp3");
-  audio.play();
+/* ===== SOUND ===== */
+function play(note,el){
+  let a=audioMap[note];
+  a.currentTime=0;
+  a.play();
+  el.classList.add("active");
 }
 
-/* กดปุ่ม */
-function pressKey(note,el){
-  play(note);
-  el.classList.add("active");
-  setTimeout(()=>el.classList.remove("active"),300);
-
-  if(gameMode){
-    checkAnswer(note);
+function stop(){
+  if(currentKey){
+    audioMap[currentKey].pause();
+    audioMap[currentKey].currentTime=0;
+    let el=document.querySelector(`[data-note="${currentKey}"]`);
+    if(el) el.classList.remove("active");
+    currentKey=null;
   }
 }
 
-/* ===== GAME MODE ===== */
-let sequence = [];
-let player = [];
-let score = 0;
-let gameMode = false;
+/* ===== TOUCH ===== */
+piano.addEventListener("touchstart",touch);
+piano.addEventListener("touchmove",touch);
+piano.addEventListener("touchend",stop);
 
-function startGame(){
+function touch(e){
+  e.preventDefault();
+  let t=e.touches[0];
+  let el=document.elementFromPoint(t.clientX,t.clientY);
+  if(!el || !el.dataset.note) return;
+
+  let note=el.dataset.note;
+  if(currentKey!==note){
+    stop();
+    play(note,el);
+    currentKey=note;
+    if(gameMode) check(note,el);
+  }
+}
+
+/* ===== MOUSE ===== */
+let mouseDown=false;
+
+piano.addEventListener("mousedown",e=>{
+  mouseDown=true;
+  handleMouse(e);
+});
+
+piano.addEventListener("mousemove",e=>{
+  if(mouseDown) handleMouse(e);
+});
+
+document.addEventListener("mouseup",()=>{
+  mouseDown=false;
+  stop();
+});
+
+function handleMouse(e){
+  let el=document.elementFromPoint(e.clientX,e.clientY);
+  if(!el || !el.dataset.note) return;
+
+  let note=el.dataset.note;
+
+  if(currentKey!==note){
+    stop();
+    play(note,el);
+    currentKey=note;
+    if(gameMode) check(note,el);
+  }
+}
+
+/* ===== GAME ===== */
+let sequence=[],player=[];
+let score=0,level=1;
+let gameMode=false;
+let mode="";
+
+function startMemory(){
+  reset();
+  mode="memory";
+  next();
+}
+
+function startFollow(){
+  reset();
+  mode="follow";
+  spawnNote();
+}
+
+function reset(){
   sequence=[];
   player=[];
   score=0;
+  level=1;
   gameMode=true;
-  nextRound();
+  updateUI();
 }
 
-function nextRound(){
+function updateUI(){
+  document.getElementById("score").innerText=score;
+  document.getElementById("level").innerText=level;
+}
+
+function next(){
   player=[];
-  let rand = notes[Math.floor(Math.random()*notes.length)];
-  sequence.push(rand);
-  showSequence();
+  let n=notes[Math.floor(Math.random()*notes.length)];
+  sequence.push(n);
+  show();
 }
 
-function showSequence(){
+function show(){
   let i=0;
-  let interval = setInterval(()=>{
-    let note = sequence[i];
-    let el = document.querySelector(`[data-note="${note}"]`);
-    play(note);
-    el.classList.add("active");
-
-    setTimeout(()=>el.classList.remove("active"),400);
-
+  let inter=setInterval(()=>{
+    let note=sequence[i];
+    let el=document.querySelector(`[data-note="${note}"]`);
+    play(note,el);
+    setTimeout(()=>el.classList.remove("active"),300);
     i++;
-    if(i>=sequence.length){
-      clearInterval(interval);
-    }
-  },700);
+    if(i>=sequence.length) clearInterval(inter);
+  },600);
 }
 
-function checkAnswer(note){
-  player.push(note);
+function check(note,el){
+  if(mode==="memory"){
+    player.push(note);
+    let i=player.length-1;
 
-  let index = player.length-1;
+    if(player[i]!==sequence[i]){
+      wrong(el);
+      return;
+    }
 
-  if(player[index] !== sequence[index]){
-    alert("❌ ผิด! เริ่มใหม่");
-    gameMode=false;
-    return;
+    correct(el);
+
+    if(player.length===sequence.length){
+      score++;
+      level++;
+      updateUI();
+      setTimeout(next,800);
+    }
   }
 
-  if(player.length === sequence.length){
-    score++;
-    document.getElementById("score").innerText=score;
-    setTimeout(nextRound,800);
+  if(mode==="follow"){
+    if(note===target){
+      correct(el);
+      score++;
+      level++;
+      updateUI();
+      spawnNote();
+    }else{
+      wrong(el);
+    }
   }
+}
+
+function correct(el){
+  el.classList.add("correct");
+  setTimeout(()=>el.classList.remove("correct"),300);
+}
+
+function wrong(el){
+  el.classList.add("wrong");
+  setTimeout(()=>el.classList.remove("wrong"),300);
+}
+
+/* ===== FOLLOW MODE ===== */
+let target=null;
+
+function spawnNote(){
+  target=notes[Math.floor(Math.random()*notes.length)];
+  let el=document.querySelector(`[data-note="${target}"]`);
+  el.classList.add("active");
 }
 </script>
 
