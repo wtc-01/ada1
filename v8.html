@@ -256,8 +256,8 @@ function play(note,el){
 
   // 🔥 loop เฉพาะช่วง 1.5 - 2.5 วินาที
   source.loop = true;
-  source.loopStart = 1;
-  source.loopEnd = 2;
+  source.loopStart = 0.3;
+  source.loopEnd = 1;
 
   source.connect(gain);
   gain.connect(audioCtx.destination);
