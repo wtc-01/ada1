@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Kids Game</title>
+
+<style>
+body{
+  margin:0;
+  background:#e6f2ff;
+  font-family:sans-serif;
+  text-align:center;
+}
+
+h2{
+  margin:10px;
+}
+
+/* piano container */
+.piano{
+  position:relative;
+  width:100%;
+  max-width:900px;
+  height:250px;
+  margin:auto;
+}
+
+/* white keys */
+.white{
+  width:calc(100% / 14);
+  height:100%;
+  background:white;
+  border:1px solid #333;
+  float:left;
+  box-sizing:border-box;
+}
+
+/* black keys */
+.black{
+  position:absolute;
+  width:4%;
+  height:60%;
+  background:black;
+  top:0;
+  z-index:2;
+  border-radius:0 0 5px 5px;
+}
+
+/* active เอฟเฟกต์ */
+.active{
+  background:yellow !important;
+}
+
+.white:active{
+  background:#ddd;
+}
+.black:active{
+  background:#444;
+}
+
+button{
+  margin:10px;
+  padding:10px 20px;
+  font-size:18px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎹 Piano Kids Game</h2>
+<button onclick="startGame()">เริ่มเกม</button>
+<p>คะแนน: <span id="score">0</span></p>
+
+<div class="piano" id="piano"></div>
+
+<script>
+const notes = [
+"C4","D4","E4","F4","G4","A4","B4",
+"C5","D5","E5","F5","G5","A5","B5"
+];
+
+const blackMap = {
+"C4":"C#4","D4":"D#4","F4":"F#4","G4":"G#4","A4":"A#4",
+"C5":"C#5","D5":"D#5","F5":"F#5","G5":"G#5","A5":"A#5"
+};
+
+const piano = document.getElementById("piano");
+
+/* สร้างคีย์ */
+notes.forEach((note,i)=>{
+  let key = document.createElement("div");
+  key.className="white";
+  key.dataset.note=note;
+  key.onclick=()=>pressKey(note,key);
+  piano.appendChild(key);
+
+  if(blackMap[note]){
+    let black = document.createElement("div");
+    black.className="black";
+    black.dataset.note=blackMap[note];
+    black.style.left = (i * (100/14) + (100/14)*0.7) + "%";
+    black.onclick=()=>pressKey(blackMap[note],black);
+    piano.appendChild(black);
+  }
+});
+
+/* เล่นเสียง */
+function play(note){
+  let audio = new Audio("electric_piano_sounds/" + note + ".mp3");
+  audio.play();
+}
+
+/* กดปุ่ม */
+function pressKey(note,el){
+  play(note);
+  el.classList.add("active");
+  setTimeout(()=>el.classList.remove("active"),300);
+
+  if(gameMode){
+    checkAnswer(note);
+  }
+}
+
+/* ===== GAME MODE ===== */
+let sequence = [];
+let player = [];
+let score = 0;
+let gameMode = false;
+
+function startGame(){
+  sequence=[];
+  player=[];
+  score=0;
+  gameMode=true;
+  nextRound();
+}
+
+function nextRound(){
+  player=[];
+  let rand = notes[Math.floor(Math.random()*notes.length)];
+  sequence.push(rand);
+  showSequence();
+}
+
+function showSequence(){
+  let i=0;
+  let interval = setInterval(()=>{
+    let note = sequence[i];
+    let el = document.querySelector(`[data-note="${note}"]`);
+    play(note);
+    el.classList.add("active");
+
+    setTimeout(()=>el.classList.remove("active"),400);
+
+    i++;
+    if(i>=sequence.length){
+      clearInterval(interval);
+    }
+  },700);
+}
+
+function checkAnswer(note){
+  player.push(note);
+
+  let index = player.length-1;
+
+  if(player[index] !== sequence[index]){
+    alert("❌ ผิด! เริ่มใหม่");
+    gameMode=false;
+    return;
+  }
+
+  if(player.length === sequence.length){
+    score++;
+    document.getElementById("score").innerText=score;
+    setTimeout(nextRound,800);
+  }
+}
+</script>
+
+</body>
+</html>
