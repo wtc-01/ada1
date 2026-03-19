@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Kids 3 Octave</title>
+
+<style>
+body{
+  margin:0;
+  background:#e6f2ff;
+  text-align:center;
+  font-family:sans-serif;
+}
+
+.piano{
+  position:relative;
+  width:100%;
+  max-width:1100px;
+  height:260px;
+  margin:auto;
+  display:flex;
+}
+
+/* white */
+.white{
+  flex:1;
+  height:100%;
+  background:white;
+  border:1px solid #333;
+  position:relative;
+  box-sizing:border-box;
+}
+
+/* black */
+.black{
+  position:absolute;
+  width:2.5%;
+  height:60%;
+  background:black;
+  top:0;
+  z-index:2;
+  border-radius:0 0 5px 5px;
+}
+
+.label{
+  position:absolute;
+  bottom:5px;
+  width:100%;
+  font-size:11px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎹 Piano Kids 3 Octave</h2>
+
+<div class="piano" id="piano"></div>
+
+<script>
+const notes = [
+"C4","D4","E4","F4","G4","A4","B4",
+"C5","D5","E5","F5","G5","A5","B5",
+"C6","D6","E6","F6","G6","A6","B6"
+];
+
+const blackMap = {
+"C4":"Db4","D4":"Eb4","F4":"Gb4","G4":"Ab4","A4":"Bb4",
+"C5":"Db5","D5":"Eb5","F5":"Gb5","G5":"Ab5","A5":"Bb5",
+"C6":"Db6","D6":"Eb6","F6":"Gb6","G6":"Ab6","A6":"Bb6"
+};
+
+const piano = document.getElementById("piano");
+
+/* สร้าง white keys */
+notes.forEach(note=>{
+  let key=document.createElement("div");
+  key.className="white";
+  key.dataset.note=note;
+  key.innerHTML=`<div class="label">${note}</div>`;
+  piano.appendChild(key);
+});
+
+/* ตำแหน่งคีย์ดำจริง */
+const blackOffset = {
+"C":0.7,
+"D":1.7,
+"F":3.7,
+"G":4.7,
+"A":5.7
+};
+
+/* สร้าง black keys */
+notes.forEach((note,i)=>{
+  let base = note[0];
+
+  if(blackMap[note] && blackOffset[base] !== undefined){
+    let b=document.createElement("div");
+    b.className="black";
+
+    let octave = Math.floor(i/7);
+    let pos = (octave*7 + blackOffset[base]) * (100/21);
+    b.style.left = pos + "%";
+
+    let bn = blackMap[note];
+    b.dataset.note=bn;
+    b.innerHTML=`<div class="label" style="color:white">${bn}</div>`;
+
+    piano.appendChild(b);
+  }
+});
+
+/* ===== SOUND ===== */
+let audioMap = {};
+let currentKey = null;
+
+function load(note){
+  let a=new Audio("electric_piano_sounds/"+note+".mp3");
+  a.loop=true;
+  audioMap[note]=a;
+}
+
+notes.forEach(n=>{
+  load(n);
+  if(blackMap[n]) load(blackMap[n]);
+});
+
+function play(note,el){
+  let a=audioMap[note];
+  a.currentTime=0;
+  a.play();
+  el.classList.add("active");
+}
+
+function stop(){
+  if(currentKey){
+    audioMap[currentKey].pause();
+    audioMap[currentKey].currentTime=0;
+    let el=document.querySelector(`[data-note="${currentKey}"]`);
+    if(el) el.classList.remove("active");
+    currentKey=null;
+  }
+}
+
+/* ===== TOUCH ===== */
+piano.addEventListener("touchstart",touch);
+piano.addEventListener("touchmove",touch);
+piano.addEventListener("touchend",stop);
+
+function touch(e){
+  e.preventDefault();
+  let t=e.touches[0];
+  let el=document.elementFromPoint(t.clientX,t.clientY);
+  if(!el || !el.dataset.note) return;
+
+  let note=el.dataset.note;
+
+  if(currentKey!==note){
+    stop();
+    play(note,el);
+    currentKey=note;
+  }
+}
+
+/* ===== MOUSE ===== */
+let mouseDown=false;
+
+piano.addEventListener("mousedown",e=>{
+  mouseDown=true;
+  handleMouse(e);
+});
+
+piano.addEventListener("mousemove",e=>{
+  if(mouseDown) handleMouse(e);
+});
+
+document.addEventListener("mouseup",()=>{
+  mouseDown=false;
+  stop();
+});
+
+function handleMouse(e){
+  let el=document.elementFromPoint(e.clientX,e.clientY);
+  if(!el || !el.dataset.note) return;
+
+  let note=el.dataset.note;
+
+  if(currentKey!==note){
+    stop();
+    play(note,el);
+    currentKey=note;
+  }
+}
+</script>
+
+</body>
+</html>
