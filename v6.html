@@ -240,32 +240,39 @@ function play(note,el){
   if(!buffer) return;
 
   let source = audioCtx.createBufferSource();
+  let gain = audioCtx.createGain();
+
   source.buffer = buffer;
 
-  // ✅ ทำให้เสียงยาว
-  source.loop = true;
+  source.connect(gain);
+  gain.connect(audioCtx.destination);
 
-  source.connect(audioCtx.destination);
   source.start(0);
 
-  // ✅ เก็บ source ของโน้ตนี้
-  activeSources[note] = source;
+  // 🔥 เก็บทั้ง source + gain
+  activeSources[note] = { source, gain };
 
   el.classList.add("active");
 }
 function stopNote(note){
-  let source = activeSources[note];
-  if(source){
-    let gain = audioCtx.createGain();
-    source.connect(gain);
-    gain.connect(audioCtx.destination);
+  let obj = activeSources[note];
+  if(obj){
+    let { source, gain } = obj;
 
+    // 🔥 fade out
     gain.gain.setValueAtTime(1, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
 
-    setTimeout(()=>source.stop(),300);
+    setTimeout(()=>{
+      source.stop();
+    },300);
+
     delete activeSources[note];
   }
+
+  // 🔥 เอาสีออก
+  let el=document.querySelector(`[data-note="${note}"]`);
+  if(el) el.classList.remove("active");
 }
 function stop(){
   if(currentKey){
@@ -334,7 +341,7 @@ function touch(e){
     }
   }
 
-  // ✅ หยุดโน้ตที่ไม่ได้กดแล้ว
+  // 🔥 หยุด + เอาสีออก
   Object.keys(activeSources).forEach(note=>{
     if(!touchingNotes.has(note)){
       stopNote(note);
@@ -384,10 +391,10 @@ async function handleMouse(e){
 }
 
 document.addEventListener("mouseup",()=>{
-  if(currentMouseNote){
-    stopNote(currentMouseNote);
-    currentMouseNote = null;
-  }
+  Object.keys(activeSources).forEach(note=>{
+    stopNote(note);
+  });
+  currentMouseNote = null;
 });
 /* ===== GAME ===== */
 let sequence=[],player=[];
