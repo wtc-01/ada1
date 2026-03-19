@@ -254,10 +254,10 @@ function play(note,el){
 
   source.buffer = buffer;
 
-  // 🎯 เลือกช่วงกลางไฟล์ (ต้องปรับเอง)
+  // 🔥 loop เฉพาะช่วง 1.5 - 2.5 วินาที
   source.loop = true;
-  source.loopStart = 0.3;   // ข้าม attack
-  source.loopEnd   = buffer.duration - 0.3; // ตัด release
+  source.loopStart = 1;
+  source.loopEnd = 2;
 
   source.connect(gain);
   gain.connect(audioCtx.destination);
