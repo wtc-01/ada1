@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Kids Ultimate Pro</title>
+
+<style>
+body{
+  margin:0;
+  background:#e6f2ff;
+  text-align:center;
+  font-family:sans-serif;
+}
+
+h2{margin:10px;}
+
+.piano{
+  position:relative;
+  width:100%;
+  max-width:900px;
+  height:260px;
+  margin:auto;
+  display:flex;
+}
+
+/* white */
+.white{
+  flex:1;
+  height:100%;
+  background:white;
+  border:1px solid #333;
+  position:relative;
+  box-sizing:border-box;
+  box-shadow: inset 0 -5px 5px rgba(0,0,0,0.2);
+}
+
+/* black */
+.black{
+  position:absolute;
+  width:3.5%;
+  height:60%;
+  background:black;
+  top:0;
+  z-index:2;
+  border-radius:0 0 5px 5px;
+  box-shadow: inset 0 -3px 5px rgba(255,255,255,0.2);
+}
+
+.label{
+  position:absolute;
+  bottom:5px;
+  width:100%;
+  font-size:12px;
+}
+
+/* เอฟเฟกต์ */
+.active{
+  background:#ffe066 !important;
+  box-shadow:0 0 20px yellow;
+}
+
+.correct{
+  background:#8cff8c !important;
+}
+.wrong{
+  background:#ff6b6b !important;
+}
+
+button{
+  margin:5px;
+  padding:10px;
+  font-size:16px;
+}
+#loader{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:#000000cc;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  z-index:9999;
+}
+
+#barWrap{
+  width:70%;
+  height:20px;
+  background:#333;
+  border-radius:10px;
+  overflow:hidden;
+  margin-top:10px;
+}
+
+#bar{
+  width:0%;
+  height:100%;
+  background:lime;
+  transition:0.2s;
+}
+#fallArea{
+  position:relative;
+  width:100%;
+  max-width:900px;
+  height:300px;
+  margin:10px auto;
+  background:#111;
+  overflow:hidden;
+}
+
+.fall-note{
+  position:absolute;
+  width:6%;
+  height:30px;
+  background:#00e5ff;
+  border-radius:5px;
+  top:-40px;
+  transition:0.05s linear;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎹 Piano Kids</h2>
+<div id="loader">
+  <div id="loadingText">Loading 0%</div>
+  <div id="barWrap">
+    <div id="bar"></div>
+  </div>
+</div>
+<button onclick="startMemory()">🎯 Memory</button>
+<button onclick="startFollow()">💡 Follow</button>
+<button onclick="startSong()">🎵 Play Song</button>
+
+<p>⭐ คะแนน: <span id="score">0</span> | Level: <span id="level">1</span></p>
+
+<div id="fallArea"></div>
+<div class="piano" id="piano"></div>
+
+<script>
+
+let activeSources = {};
+const notes = [
+"C4","D4","E4","F4","G4","A4","B4",
+"C5","D5","E5","F5","G5","A5","B5"
+];
+
+const blackMap = {
+"C4":"Db4","D4":"Eb4","F4":"Gb4","G4":"Ab4","A4":"Bb4",
+"C5":"Db5","D5":"Eb5","F5":"Gb5","G5":"Ab5","A5":"Bb5"
+};
+
+const songData = [
+  // We wish you a merry christmas
+  { note:"C4", time:0 },
+  { note:"F4", time:500 },
+  { note:"F4", time:900 },
+  { note:"G4", time:1300 },
+  { note:"F4", time:1700 },
+  { note:"E4", time:2100 },
+  { note:"D4", time:2500 },
+  { note:"D4", time:2900 },
+
+  { note:"G4", time:3400 },
+  { note:"G4", time:3800 },
+  { note:"A4", time:4200 },
+  { note:"G4", time:4600 },
+  { note:"F4", time:5000 },
+  { note:"E4", time:5400 },
+  { note:"C4", time:5800 },
+  { note:"C4", time:6200 },
+
+  // Good tidings we bring
+  { note:"A4", time:6700 },
+  { note:"A4", time:7100 },
+  { note:"Bb4", time:7500 },
+  { note:"A4", time:7900 },
+  { note:"G4", time:8300 },
+  { note:"F4", time:8700 },
+  { note:"D4", time:9100 },
+  { note:"C4", time:9500 },
+
+  // ending
+  { note:"F4", time:10000 },
+  { note:"G4", time:10400 },
+  { note:"F4", time:10800 },
+  { note:"E4", time:11200 },
+  { note:"D4", time:11600 },
+  { note:"C4", time:12000 }
+];
+
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let bufferMap = {};
+
+const piano = document.getElementById("piano");
+let audioMap = {};
+//let currentKey=null;
+
+/* preload */
+/*async function load(note){
+  let res = await fetch("electric_piano_sounds/" + note + ".mp3");
+  let arrayBuffer = await res.arrayBuffer();
+  let audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  bufferMap[note] = audioBuffer;
+}*/
+
+let isLoaded = false;
+async function preloadAll(){
+  let allNotes = [];
+
+  notes.forEach(n=>{
+    allNotes.push(n);
+    if(blackMap[n]) allNotes.push(blackMap[n]);
+  });
+
+  let total = allNotes.length;
+  let loaded = 0;
+
+  for(let note of allNotes){
+    try{
+      await load(note);
+    }catch(err){
+      console.error("โหลดไม่ได้:", note, err);
+    }
+
+    loaded++;
+    let percent = Math.floor((loaded/total)*100);
+
+    document.getElementById("bar").style.width = percent + "%";
+    document.getElementById("loadingText").innerText = "Loading " + percent + "%";
+  }
+
+  document.getElementById("loader").style.display = "none";
+  isLoaded = true;
+}
+preloadAll();
+/*
+async function load(note){
+  let res = await fetch("electric_piano_sounds/" + note + ".mp3");
+  let arrayBuffer = await res.arrayBuffer();
+  let audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  bufferMap[note] = audioBuffer;
+}*/
+async function load(note){
+  let url = "electric_piano_sounds/" + note + ".mp3";
+  console.log("กำลังโหลด:", url);
+
+  let res = await fetch(url);
+  if(!res.ok){
+    throw new Error("ไฟล์ไม่เจอ: " + url);
+  }
+
+  let arrayBuffer = await res.arrayBuffer();
+  let audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  bufferMap[note] = audioBuffer;
+}
+
+/* สร้างคีย์ขาว */
+notes.forEach((note,i)=>{
+  let key=document.createElement("div");
+  key.className="white";
+  key.dataset.note=note;
+  key.innerHTML=`<div class="label">${note}</div>`;
+  piano.appendChild(key);
+});
+
+/* ตำแหน่งคีย์ดำจริง */
+const blackOffset = {
+"C":0.7,
+"D":1.7,
+"F":3.7,
+"G":4.7,
+"A":5.7
+};
+
+/* สร้างคีย์ดำ */
+notes.forEach((note,i)=>{
+  let base = note[0];
+
+  if(blackMap[note] && blackOffset[base] !== undefined){
+    let b=document.createElement("div");
+    b.className="black";
+    let octave = Math.floor(i/7);
+    let pos = (octave*7 + blackOffset[base]) * (100/14);
+    b.style.left = pos + "%";
+
+    let bn = blackMap[note];
+    b.dataset.note=bn;
+    b.innerHTML=`<div class="label" style="color:white">${bn}</div>`;
+    piano.appendChild(b);
+  }
+});
+
+/* ===== SOUND ===== */
+/*const loopPoints = {
+  "C4": [0.25, 1.8],
+  "D4": [0.3, 1.7],
+  "E4": [0.28, 1.6],
+};
+let [start,end] = loopPoints[note] || [0.2, buffer.duration-0.2];
+
+source.loopStart = start;
+source.loopEnd = end;
+*/
+function play(note,el){
+  let buffer = bufferMap[note];
+  if(!buffer) return;
+
+  let source = audioCtx.createBufferSource();
+  let gain = audioCtx.createGain();
+
+  source.buffer = buffer;
+
+  // 🔥 loop เฉพาะช่วง 1.5 - 2.5 วินาที
+  source.loop = true;
+  source.loopStart = 0.8;
+  source.loopEnd = 1;
+
+  source.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  source.start(0);
+
+  activeSources[note] = { source, gain };
+
+  el.classList.add("active");
+}
+
+function stopNote(note){
+  let obj = activeSources[note];
+  if(obj){
+    let { source, gain } = obj;
+
+    // 🔥 fade out เนียน
+    gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+    setTimeout(()=>{
+      source.stop();
+    },300);
+
+    delete activeSources[note];
+  }
+
+  let el=document.querySelector(`[data-note="${note}"]`);
+  if(el) el.classList.remove("active");
+}
+function stop(){
+  if(currentKey){
+    let el=document.querySelector(`[data-note="${currentKey}"]`);
+    if(el) el.classList.remove("active");
+    currentKey=null;
+  }
+}
+//ปลดล๊อก IOS
+document.body.addEventListener("touchstart", () => {
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}, { once: true });
+
+/* ===== TOUCH ===== */
+piano.addEventListener("touchstart",touch);
+piano.addEventListener("touchmove",touch);
+piano.addEventListener("touchend",stop);
+piano.addEventListener("touchend", (e)=>{
+  e.preventDefault();
+
+  let stillTouching = new Set();
+
+  for(let t of e.touches){
+    let el=document.elementFromPoint(t.clientX,t.clientY);
+    if(el && el.dataset.note){
+      stillTouching.add(el.dataset.note);
+    }
+  }
+
+  Object.keys(activeSources).forEach(note=>{
+    if(!stillTouching.has(note)){
+      stopNote(note);
+    }
+  });
+});
+piano.addEventListener("touchcancel", ()=>{
+  Object.keys(activeSources).forEach(note=>{
+    stopNote(note);
+  });
+});
+function touch(e){
+  e.preventDefault();
+
+  let touchingNotes = new Set();
+
+  for(let t of e.touches){
+    let el=document.elementFromPoint(t.clientX,t.clientY);
+    if(!el || !el.dataset.note) continue;
+
+    let note=el.dataset.note;
+    touchingNotes.add(note);
+
+    if(!activeSources[note]){
+      play(note,el);
+      if(gameMode) check(note,el);
+    }
+  }
+
+  // 🔥 หยุด + เอาสีออก
+  Object.keys(activeSources).forEach(note=>{
+    if(!touchingNotes.has(note)){
+      stopNote(note);
+    }
+  });
+}
+
+/* ===== MOUSE ===== */
+let mouseDown=false;
+
+piano.addEventListener("mousedown",e=>{
+  mouseDown=true;
+  handleMouse(e);
+});
+
+piano.addEventListener("mousemove",e=>{
+  if(mouseDown) handleMouse(e);
+});
+
+document.addEventListener("mouseup",()=>{
+  mouseDown=false;
+  stop();
+});
+
+let currentMouseNote = null;
+
+async function handleMouse(e){
+  if(audioCtx.state === "suspended"){
+    await audioCtx.resume();
+  }
+
+  let el=document.elementFromPoint(e.clientX,e.clientY);
+  if(!el || !el.dataset.note) return;
+
+  let note=el.dataset.note;
+
+  if(currentMouseNote !== note){
+    if(currentMouseNote){
+      stopNote(currentMouseNote);
+    }
+
+    play(note,el);
+    currentMouseNote = note;
+
+    if(gameMode) check(note,el);
+  }
+}
+
+document.addEventListener("mouseup",()=>{
+  Object.keys(activeSources).forEach(note=>{
+    stopNote(note);
+  });
+  currentMouseNote = null;
+});
+/* ===== GAME ===== */
+let sequence=[],player=[];
+let score=0,level=1;
+let gameMode=false;
+let mode="";
+
+function startMemory(){
+  reset();
+  mode="memory";
+  next();
+}
+
+function startFollow(){
+  reset();
+  mode="follow";
+  spawnNote();
+}
+
+function reset(){
+  sequence=[];
+  player=[];
+  score=0;
+  level=1;
+  gameMode=true;
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById("score").innerText=score;
+  document.getElementById("level").innerText=level;
+}
+
+function next(){
+  player=[];
+  let n=notes[Math.floor(Math.random()*notes.length)];
+  sequence.push(n);
+  show();
+}
+
+function show(){
+  let i=0;
+  let inter=setInterval(()=>{
+    let note=sequence[i];
+    let el=document.querySelector(`[data-note="${note}"]`);
+    play(note,el);
+    setTimeout(()=>el.classList.remove("active"),300);
+    i++;
+    if(i>=sequence.length) clearInterval(inter);
+  },600);
+}
+
+function check(note,el){
+  if(mode==="memory"){
+    player.push(note);
+    let i=player.length-1;
+
+    if(player[i]!==sequence[i]){
+      wrong(el);
+      return;
+    }
+
+    correct(el);
+
+    if(player.length===sequence.length){
+      score++;
+      level++;
+      updateUI();
+      setTimeout(next,800);
+    }
+  }
+
+  if(mode==="follow"){
+    if(note===target){
+      correct(el);
+      score++;
+      level++;
+      updateUI();
+      spawnNote();
+    }else{
+      wrong(el);
+    }
+  }
+}
+
+function correct(el){
+  el.classList.add("correct");
+  setTimeout(()=>el.classList.remove("correct"),300);
+}
+
+function wrong(el){
+  el.classList.add("wrong");
+  setTimeout(()=>el.classList.remove("wrong"),300);
+}
+
+/* ===== FOLLOW MODE ===== */
+let target=null;
+
+function spawnNote(){
+  target=notes[Math.floor(Math.random()*notes.length)];
+  let el=document.querySelector(`[data-note="${target}"]`);
+  el.classList.add("active");
+}
+let fallNotes = [];
+let startTime = 0;
+let isPlayingSong = false;
+
+function startSong(){
+  reset();
+  isPlayingSong = true;
+  startTime = performance.now();
+
+  songData.forEach(note=>{
+    setTimeout(()=>{
+      createFallNote(note);
+    }, note.time);
+  });
+
+  requestAnimationFrame(updateFall);
+}
+
+function createFallNote(note){
+  let el = document.createElement("div");
+  el.className = "fall-note";
+  el.dataset.note = note.note;
+
+  let index = notes.indexOf(note.note);
+  el.style.left = (index * (100/14)) + "%";
+
+  document.getElementById("fallArea").appendChild(el);
+
+  fallNotes.push({
+    el: el,
+    time: note.time
+  });
+}
+function updateFall(){
+  if(!isPlayingSong) return;
+
+  let now = performance.now() - startTime;
+
+  fallNotes.forEach(n=>{
+    let diff = now - n.time;
+
+    n.el.style.top = (diff * 0.25) + "px";
+
+    // หลุด = พลาด
+    if(diff > 2000){
+      n.el.remove();
+    }
+  });
+
+  requestAnimationFrame(updateFall);
+}
+if(isPlayingSong){
+  fallNotes.forEach((n,i)=>{
+    let rect = n.el.getBoundingClientRect();
+    let pianoRect = piano.getBoundingClientRect();
+
+    // จุดกด = ใกล้คีย์
+    if(
+      note === n.el.dataset.note &&
+      rect.top > pianoRect.top - 50 &&
+      rect.top < pianoRect.top + 50
+    ){
+      score++;
+      updateUI();
+
+      n.el.remove();
+      fallNotes.splice(i,1);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
